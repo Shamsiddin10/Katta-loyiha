@@ -1,0 +1,266 @@
+// ============================================
+// EduSys - Prisma Schema
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Rollar
+// ============================================
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  DIRECTOR
+  TEACHER
+  STUDENT
+}
+
+// ============================================
+// Foydalanuvchi
+// ============================================
+model User {
+  id          String   @id @default(cuid())
+  phone       String   @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        Role     @default(STUDENT)
+  isActive    Boolean  @default(true)
+  avatar      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Director uchun
+  directedCourses Course[]       @relation("DirectorCourses")
+  penalties       Penalty[]      @relation("PenaltyTarget")
+  createdPenalties Penalty[]     @relation("PenaltyCreator")
+  bonuses         Bonus[]        @relation("BonusTarget")
+  createdBonuses  Bonus[]        @relation("BonusCreator")
+  expenses        Expense[]      @relation("ExpenseCreator")
+  monthlyReports  MonthlyReport[] @relation("ReportCreator")
+
+  // Teacher uchun
+  teacherCourses  CourseTeacher[]
+  lessons         Lesson[]
+
+  // Student uchun
+  enrollments     Enrollment[]
+  attendances     Attendance[]
+  grades          Grade[]
+
+  @@map("users")
+}
+
+// ============================================
+// Kurs (Course)
+// ============================================
+model Course {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float    @default(0)
+  duration    Int      @default(1) // oyda
+  isActive    Boolean  @default(true)
+  directorId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  director    User            @relation("DirectorCourses", fields: [directorId], references: [id])
+  teachers    CourseTeacher[]
+  enrollments Enrollment[]
+  lessons     Lesson[]
+
+  @@map("courses")
+}
+
+// ============================================
+// Kurs-Teacher bog'lanish
+// ============================================
+model CourseTeacher {
+  id        String   @id @default(cuid())
+  courseId   String
+  teacherId  String
+  assignedAt DateTime @default(now())
+
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacher User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, teacherId])
+  @@map("course_teachers")
+}
+
+// ============================================
+// Darslar (Lessons)
+// ============================================
+model Lesson {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  courseId   String
+  teacherId String
+  date      DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacher     User         @relation(fields: [teacherId], references: [id])
+  attendances Attendance[]
+  grades      Grade[]
+
+  @@map("lessons")
+}
+
+// ============================================
+// Davomat (Attendance)
+// ============================================
+model Attendance {
+  id        String   @id @default(cuid())
+  studentId String
+  lessonId  String
+  isPresent Boolean  @default(false)
+  date      DateTime @default(now())
+
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson  Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, lessonId])
+  @@map("attendances")
+}
+
+// ============================================
+// Baholar (Grades)
+// ============================================
+model Grade {
+  id        String   @id @default(cuid())
+  studentId String
+  lessonId  String
+  score     Float
+  comment   String?
+  createdAt DateTime @default(now())
+
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson  Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, lessonId])
+  @@map("grades")
+}
+
+// ============================================
+// O'quvchi ro'yxatga olish (Enrollment)
+// ============================================
+model Enrollment {
+  id        String   @id @default(cuid())
+  studentId String
+  courseId   String
+  status    EnrollmentStatus @default(ACTIVE)
+  enrolledAt DateTime @default(now())
+
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+}
+
+// ============================================
+// Jarima (Penalty)
+// ============================================
+model Penalty {
+  id          String   @id @default(cuid())
+  targetId    String
+  createdById String
+  amount      Float
+  reason      String
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  target    User @relation("PenaltyTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  createdBy User @relation("PenaltyCreator", fields: [createdById], references: [id])
+
+  @@map("penalties")
+}
+
+// ============================================
+// Bonus (Mukofot)
+// ============================================
+model Bonus {
+  id          String   @id @default(cuid())
+  targetId    String
+  createdById String
+  amount      Float
+  reason      String
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  target    User @relation("BonusTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  createdBy User @relation("BonusCreator", fields: [createdById], references: [id])
+
+  @@map("bonuses")
+}
+
+// ============================================
+// Xarajat (Expense)
+// ============================================
+model Expense {
+  id          String        @id @default(cuid())
+  title       String
+  amount      Float
+  category    ExpenseCategory
+  description String?
+  date        DateTime      @default(now())
+  createdById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  createdBy User @relation("ExpenseCreator", fields: [createdById], references: [id])
+
+  @@map("expenses")
+}
+
+enum ExpenseCategory {
+  RENT          // Ijara
+  SALARY        // Oylik maosh
+  EQUIPMENT     // Jihozlar
+  UTILITIES     // Kommunal
+  MARKETING     // Reklama
+  SUPPLIES      // Ta'minot
+  OTHER         // Boshqa
+}
+
+// ============================================
+// Oylik Hisobot (Monthly Report)
+// ============================================
+model MonthlyReport {
+  id              String   @id @default(cuid())
+  month           Int
+  year            Int
+  totalIncome     Float    @default(0)
+  totalExpense    Float    @default(0)
+  totalPenalties  Float    @default(0)
+  totalBonuses    Float    @default(0)
+  netProfit       Float    @default(0)
+  studentsCount   Int      @default(0)
+  teachersCount   Int      @default(0)
+  notes           String?
+  createdById     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  createdBy User @relation("ReportCreator", fields: [createdById], references: [id])
+
+  @@unique([month, year])
+  @@map("monthly_reports")
+}
