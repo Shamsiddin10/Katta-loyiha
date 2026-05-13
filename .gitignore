@@ -14,9 +14,11 @@ out/
 .env.local
 .env.production
 .env.*.local
-.env.example
 backend/.env
 frontend/.env.local
+
+# .env.example fayllar GIT da QOLADI (namuna, maxfiy emas)
+# !.env.example
 
 # IDE
 .vscode/
